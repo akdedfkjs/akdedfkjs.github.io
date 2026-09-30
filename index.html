@@ -1,0 +1,175 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>GameHub</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#070a14;color:#fff;font-family:Arial,sans-serif}
+header{text-align:center;padding:24px;background:linear-gradient(135deg,#161e46,#4b115c)}h1{margin:0;font-size:36px}header p{opacity:.8}
+.tools{position:sticky;top:0;z-index:5;display:flex;gap:8px;justify-content:center;flex-wrap:wrap;padding:12px;background:#10172a}
+input,select,.action{font:inherit;padding:10px;border-radius:10px}input,select{background:#202b4b;color:white;border:1px solid #405080}.action{border:0;background:#586fe0;color:white;font-weight:bold;cursor:pointer}
+#grid{max-width:1100px;margin:18px auto;padding:0 12px;display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:10px}
+.game-card{min-height:125px;border:1px solid #30406c;border-radius:14px;background:#141b30;color:#fff;padding:14px;text-align:left;cursor:pointer;transition:.12s}
+.game-card:hover{transform:translateY(-2px);border-color:#7d8cff;background:#1b2541}.game-card span{display:block;font-size:32px}.game-card strong{display:block;margin-top:8px;font-size:16px}.game-card small{opacity:.6}
+#gamePanel{display:none;max-width:950px;margin:20px auto;padding:15px;background:#12192c;border:1px solid #30406c;border-radius:16px}
+#gamePanel.active{display:block}#gameCanvas{display:block;width:100%;height:auto;background:#05070d;border-radius:12px;touch-action:none}
+.row{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}#help{text-align:center;opacity:.7;font-size:13px}
+@media(max-width:600px){h1{font-size:28px}#grid{grid-template-columns:repeat(2,1fr)}}
+</style></head>
+<body>
+<header><h1>🎮 GameHub</h1><p>15 actually playable mini-games • works inside the Google Sites embed</p></header>
+<div class="tools"><input id="search" placeholder="🔎 Search games"><select id="category"><option>All</option><option>Action</option><option>Arcade</option><option>Idle</option><option>Platformer</option><option>Puzzle</option><option>Racing</option><option>Sports</option></select><button id="random" class="action">🎲 Random</button></div>
+<div id="grid"><button class="game-card" data-game="0"><span>🟣</span><strong>Slope</strong><small>Arcade</small></button><button class="game-card" data-game="1"><span>🟦</span><strong>OvO</strong><small>Platformer</small></button><button class="game-card" data-game="2"><span>🍪</span><strong>Cookie Clicker</strong><small>Idle</small></button><button class="game-card" data-game="3"><span>🏍️</span><strong>Moto X3M</strong><small>Racing</small></button><button class="game-card" data-game="4"><span>🐍</span><strong>Snake</strong><small>Arcade</small></button><button class="game-card" data-game="5"><span>🐦</span><strong>Flappy Bird</strong><small>Arcade</small></button><button class="game-card" data-game="6"><span>🏎️</span><strong>Racing</strong><small>Racing</small></button><button class="game-card" data-game="7"><span>🚀</span><strong>Space Shooter</strong><small>Action</small></button><button class="game-card" data-game="8"><span>🏀</span><strong>Basketball</strong><small>Sports</small></button><button class="game-card" data-game="9"><span>🧱</span><strong>Breakout</strong><small>Arcade</small></button><button class="game-card" data-game="10"><span>⚡</span><strong>Dodge</strong><small>Arcade</small></button><button class="game-card" data-game="11"><span>🌈</span><strong>Tunnel Rush</strong><small>Arcade</small></button><button class="game-card" data-game="12"><span>🏃</span><strong>Platform Runner</strong><small>Platformer</small></button><button class="game-card" data-game="13"><span>🛡️</span><strong>Tank</strong><small>Action</small></button><button class="game-card" data-game="14"><span>🫧</span><strong>Bubble Pop</strong><small>Puzzle</small></button></div>
+<section id="gamePanel"><div class="row"><strong id="gameTitle">Game</strong><button id="back" class="action">← Back</button></div><canvas id="gameCanvas" width="900" height="520"></canvas><p id="help"></p></section>
+<script>
+const GAMES=[("Slope", "Arcade", "slope"), ("OvO", "Platformer", "ovo"), ("Cookie Clicker", "Idle", "cookie"), ("Moto X3M", "Racing", "moto"), ("Snake", "Arcade", "snake"), ("Flappy Bird", "Arcade", "flappy"), ("Racing", "Racing", "racing"), ("Space Shooter", "Action", "shooter"), ("Basketball", "Sports", "basket"), ("Breakout", "Arcade", "breakout"), ("Dodge", "Arcade", "dodge"), ("Tunnel Rush", "Arcade", "tunnel"), ("Platform Runner", "Platformer", "runner"), ("Tank", "Action", "tank"), ("Bubble Pop", "Puzzle", "bubble")];
+const canvas=document.getElementById("gameCanvas");
+const ctx=canvas.getContext("2d");
+const panel=document.getElementById("gamePanel");
+const title=document.getElementById("gameTitle");
+const help=document.getElementById("help");
+let animation=0, keys={}, cleanup=()=>{};
+document.querySelectorAll(".game-card").forEach(btn=>{
+  btn.addEventListener("click",()=>openGame(Number(btn.dataset.game)));
+});
+document.getElementById("search").addEventListener("input",filter);
+document.getElementById("category").addEventListener("change",filter);
+document.getElementById("random").addEventListener("click",()=>openGame(Math.floor(Math.random()*GAMES.length)));
+document.getElementById("back").addEventListener("click",closeGame);
+window.addEventListener("keydown",e=>{keys[e.key.toLowerCase()]=true});
+window.addEventListener("keyup",e=>{keys[e.key.toLowerCase()]=false});
+
+function filter(){
+ const q=document.getElementById("search").value.toLowerCase();
+ const cat=document.getElementById("category").value;
+ document.querySelectorAll(".game-card").forEach(b=>{
+   const g=GAMES[Number(b.dataset.game)];
+   b.hidden=!!(q && !g[0].toLowerCase().includes(q)) || !(cat==="All"||g[1]===cat);
+ });
+}
+function clearGame(){
+ cancelAnimationFrame(animation); cleanup(); cleanup=()=>{};
+ ctx.clearRect(0,0,900,520);
+}
+function openGame(i){
+ clearGame();
+ const g=GAMES[i];
+ title.textContent=g[0]; panel.classList.add("active");
+ ({slope,ovo,cookie,moto,snake,flappy,racing,shooter,basket,breakout,dodge,tunnel,runner,tank,bubble}[g[2]]||slope)();
+ panel.scrollIntoView({behavior:"smooth",block:"start"});
+}
+function closeGame(){clearGame();panel.classList.remove("active")}
+function bg(c="#08101f"){ctx.fillStyle=c;ctx.fillRect(0,0,900,520)}
+function text(t,x,y,size=24){ctx.fillStyle="#fff";ctx.font=`${size}px Arial`;ctx.fillText(t,x,y)}
+function loop(fn){function f(t){fn(t);animation=requestAnimationFrame(f)}animation=requestAnimationFrame(f)}
+function buttonHint(s){help.textContent=s}
+function slope(){
+ buttonHint("A/D or ←/→ to steer • Keep the ball on the track");
+ let x=450,y=120,vx=0,vy=2,score=0;
+ loop(t=>{bg("#071124");vx+=(keys.a||keys.arrowleft?-0.35:0)+(keys.d||keys.arrowright?0.35:0);vx*=.97;vy+=.15;x+=vx;y+=vy;score++;
+ ctx.strokeStyle="#55eaff";ctx.lineWidth=9;ctx.beginPath();ctx.moveTo(0,400);
+ for(let i=0;i<19;i++)ctx.lineTo(i*50,360+Math.sin(i+t/400)*42);ctx.stroke();
+ ctx.fillStyle="#ff54dd";ctx.beginPath();ctx.arc(x,y,15,0,Math.PI*2);ctx.fill();text("Score: "+score,20,35);
+ if(y>520||x<0||x>900){x=450;y=100;vx=0;vy=2;score=0}});
+}
+function ovo(){
+ buttonHint("A/D or ←/→ move • W/↑ jump");
+ let x=70,y=420,v=0,on=false;
+ loop(()=>{bg("#0b1630");if(keys.a||keys.arrowleft)x-=4;if(keys.d||keys.arrowright)x+=4;
+ if((keys.w||keys.arrowup)&&on){v=-11;on=false}v+=.5;y+=v;if(y>420){y=420;v=0;on=true}
+ ctx.fillStyle="#5ce1ed";ctx.fillRect(0,455,900,65);
+ for(let i=0;i<8;i++){ctx.fillStyle=i%2?"#586dff":"#ff59dc";ctx.fillRect(100+i*110,410-(i%3)*65,75,18)}
+ ctx.fillStyle="#fff";ctx.fillRect(x,y-42,28,42);if(x>850)x=70});
+}
+function cookie(){
+ buttonHint("Click the cookie • Press C to buy a cursor");
+ let n=0,cursors=0;
+ const click=()=>n++;
+ canvas.addEventListener("click",click);cleanup=()=>canvas.removeEventListener("click",click);
+ const key=e=>{if(e.key.toLowerCase()==="c"&&n>=15){n-=15;cursors++}};
+ window.addEventListener("keydown",key);cleanup=()=>{canvas.removeEventListener("click",click);window.removeEventListener("keydown",key)};
+ loop(()=>{bg();text("🍪",390,280,105);text("Cookies: "+Math.floor(n),345,70,30);text("Cursors: "+cursors,370,450,22);n+=cursors*.015});
+}
+function moto(){
+ buttonHint("D/→ accelerate • A/← brake");
+ let x=100,y=380,v=0;
+ loop(()=>{bg("#13233a");if(keys.d||keys.arrowright)x+=5;if(keys.a||keys.arrowleft)x-=2;v+=.45;y+=v;if(y>380){y=380;v=-6}
+ ctx.fillStyle="#61d46d";ctx.beginPath();ctx.moveTo(0,420);for(let i=0;i<19;i++)ctx.lineTo(i*50,390+Math.sin(i+x/80)*28);ctx.lineTo(900,520);ctx.lineTo(0,520);ctx.fill();
+ ctx.fillStyle="#ff4c68";ctx.fillRect(x-28,y-12,56,14);ctx.fillStyle="#111";ctx.beginPath();ctx.arc(x-20,y+5,11,0,7);ctx.arc(x+20,y+5,11,0,7);ctx.fill();if(x>920)x=0;if(x<-20)x=920});
+}
+function snake(){
+ buttonHint("Arrow keys • Eat the red square");
+ let body=[{x:10,y:10}],dir={x:1,y:0},food={x:20,y:10},last=0;
+ const key=e=>{if(e.key==="ArrowUp"&&dir.y===0)dir={x:0,y:-1};if(e.key==="ArrowDown"&&dir.y===0)dir={x:0,y:1};if(e.key==="ArrowLeft"&&dir.x===0)dir={x:-1,y:0};if(e.key==="ArrowRight"&&dir.x===0)dir={x:1,y:0}};
+ window.addEventListener("keydown",key);cleanup=()=>window.removeEventListener("keydown",key);
+ loop(t=>{if(t-last<100)return;last=t;let h={x:body[0].x+dir.x,y:body[0].y+dir.y};
+ if(h.x<0||h.x>=30||h.y<0||h.y>=20||body.some(p=>p.x===h.x&&p.y===h.y)){body=[{x:10,y:10}];dir={x:1,y:0};return}
+ body.unshift(h);if(h.x===food.x&&h.y===food.y)food={x:Math.floor(Math.random()*30),y:Math.floor(Math.random()*20)};else body.pop();
+ bg();ctx.fillStyle="#54e28a";body.forEach(p=>ctx.fillRect(p.x*30,p.y*26,27,23));ctx.fillStyle="#ff4d68";ctx.fillRect(food.x*30,food.y*26,27,23)});
+}
+function flappy(){
+ buttonHint("Space or click to flap");
+ let y=250,v=0;
+ const flap=()=>v=-7;canvas.addEventListener("click",flap);cleanup=()=>canvas.removeEventListener("click",flap);
+ loop(()=>{bg("#62c9e7");if(keys[" "]){v=-7;keys[" "]=false}v+=.35;y+=v;
+ ctx.fillStyle="#ffd34d";ctx.beginPath();ctx.arc(160,y,19,0,7);ctx.fill();
+ let x=900-(Date.now()/5)%1100;ctx.fillStyle="#45a95a";ctx.fillRect(x,0,60,170);ctx.fillRect(x,350,60,170);if(y<0||y>520)y=250});
+}
+function racing(){
+ buttonHint("A/D or ←/→ steer");
+ let x=450;
+ loop(()=>{bg("#11151d");ctx.fillStyle="#303742";ctx.fillRect(130,0,640,520);ctx.fillStyle="#fff";
+ for(let y=-30;y<540;y+=90)ctx.fillRect(445,y,10,50);if(keys.a||keys.arrowleft)x-=6;if(keys.d||keys.arrowright)x+=6;x=Math.max(155,Math.min(745,x));
+ ctx.fillStyle="#ff5065";ctx.fillRect(x-25,400,50,75)});
+}
+function shooter(){
+ buttonHint("A/D move • Space shoots");
+ let x=450,shots=[],enemies=[];
+ loop(()=>{bg();if(keys.a)x-=5;if(keys.d)x+=5;if(keys[" "]){shots.push({x,y:440});keys[" "]=false}
+ if(Math.random()<.025)enemies.push({x:Math.random()*870,y:20});shots.forEach(s=>s.y-=9);enemies.forEach(e=>e.y+=2);
+ ctx.fillStyle="#54e38a";ctx.fillRect(x-22,450,44,18);ctx.fillStyle="#ffe15a";shots.forEach(s=>ctx.fillRect(s.x,s.y,5,12));ctx.fillStyle="#ff5269";enemies.forEach(e=>ctx.fillRect(e.x,e.y,25,25))});
+}
+function basket(){
+ buttonHint("Click to shoot baskets");
+ let score=0;const hit=()=>score++;canvas.addEventListener("click",hit);cleanup=()=>canvas.removeEventListener("click",hit);
+ loop(()=>{bg("#15223b");text("🏀",410,280,95);text("Baskets: "+score,350,70,30)});
+}
+function breakout(){
+ buttonHint("A/D or ←/→ move the paddle • Space launches");
+ let x=400,ball={x:450,y:400,vx:3,vy:-4},bricks=[];
+ for(let r=0;r<4;r++)for(let q=0;q<10;q++)bricks.push({x:55+q*80,y:60+r*30,on:true});
+ loop(()=>{bg();if(keys.a||keys.arrowleft)x-=7;if(keys.d||keys.arrowright)x+=7;x=Math.max(0,Math.min(820,x));ball.x+=ball.vx;ball.y+=ball.vy;
+ if(ball.x<8||ball.x>892)ball.vx*=-1;if(ball.y<8)ball.vy*=-1;if(ball.y>485&&ball.x>x-50&&ball.x<x+50)ball.vy=-Math.abs(ball.vy);
+ bricks.forEach(b=>{if(b.on&&ball.x>b.x&&ball.x<b.x+65&&ball.y>b.y&&ball.y<b.y+20){b.on=false;ball.vy*=-1}});
+ ctx.fillStyle="#56dff0";ctx.fillRect(x,485,100,12);ctx.fillStyle="#fff";ctx.beginPath();ctx.arc(ball.x,ball.y,8,0,7);ctx.fill();
+ bricks.forEach(b=>{if(b.on){ctx.fillStyle="#ff5bd8";ctx.fillRect(b.x,b.y,65,20)}});if(ball.y>520)ball={x:450,y:400,vx:3,vy:-4}});
+}
+function dodge(){
+ buttonHint("A/D dodge the falling blocks");
+ let x=440;
+ loop(()=>{bg();if(keys.a)x-=7;if(keys.d)x+=7;ctx.fillStyle="#55def2";ctx.fillRect(x,455,40,25);
+ for(let i=0;i<8;i++){ctx.fillStyle="#ff4d68";let ox=(i*127+Date.now()/5)%900,oy=(Date.now()/3+i*80)%520;ctx.fillRect(ox,oy,25,25)}});
+}
+function tunnel(){
+ buttonHint("A/D or ←/→ stay inside the tunnel");
+ let x=440;
+ loop(()=>{bg("#060710");if(keys.a||keys.arrowleft)x-=6;if(keys.d||keys.arrowright)x+=6;x=Math.max(120,Math.min(760,x));
+ ctx.strokeStyle="#58efff";ctx.lineWidth=5;for(let i=0;i<8;i++){let w=700-i*70,h=400-i*40;ctx.strokeRect(450-w/2,60+i*45,w,h)}
+ ctx.fillStyle="#ff54dd";ctx.fillRect(x,455,25,35)});
+}
+function runner(){
+ buttonHint("Space/W/↑ jumps");
+ let y=420,v=0;
+ loop(()=>{bg();if((keys[" "]||keys.w||keys.arrowup)&&y>=420){v=-11;keys[" "]=false}v+=.55;y+=v;if(y>420)y=420;
+ ctx.fillStyle="#55d8ff";ctx.fillRect(0,460,900,60);ctx.fillStyle="#ffd34d";ctx.fillRect(100,y-35,32,35)});
+}
+function tank(){
+ buttonHint("A/D move • Space fires");
+ let x=450;
+ loop(()=>{bg("#1b241b");if(keys.a)x-=5;if(keys.d)x+=5;ctx.fillStyle="#687c58";ctx.fillRect(x-28,430,56,30);ctx.strokeStyle="#eee";ctx.lineWidth=8;ctx.beginPath();ctx.moveTo(x,430);ctx.lineTo(x,370);ctx.stroke()});
+}
+function bubble(){
+ buttonHint("Click to pop bubbles");
+ let pops=0;const hit=()=>pops++;canvas.addEventListener("click",hit);cleanup=()=>canvas.removeEventListener("click",hit);
+ loop(()=>{bg("#08182b");for(let i=0;i<18;i++){ctx.fillStyle=["#ff5b7d","#59dfff","#ffd34d","#a875ff"][i%4];ctx.beginPath();ctx.arc(60+(i*97)%820,70+(i*63)%390,23,0,7);ctx.fill()}text("Pops: "+pops,20,35)});
+}
+</script>
+</body></html>
